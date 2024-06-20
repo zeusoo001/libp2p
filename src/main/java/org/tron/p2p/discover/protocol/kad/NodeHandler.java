@@ -12,11 +12,12 @@ import org.tron.p2p.discover.message.kad.FindNodeMessage;
 import org.tron.p2p.discover.message.kad.NeighborsMessage;
 import org.tron.p2p.discover.message.kad.PingMessage;
 import org.tron.p2p.discover.message.kad.PongMessage;
+import org.tron.p2p.discover.protocol.kad.table.KademliaOptions;
 import org.tron.p2p.discover.socket.UdpEvent;
 
 @Slf4j(topic = "net")
 public class NodeHandler {
-
+  private static long threshold = KademliaOptions.DISCOVER_CYCLE / 2;
   private Node node;
   private volatile State state;
   private KadService kadService;
@@ -24,6 +25,7 @@ public class NodeHandler {
   private AtomicInteger pingTrials = new AtomicInteger(3);
   private volatile boolean waitForPong = false;
   private volatile boolean waitForNeighbors = false;
+  private volatile long rcvFindNodeMsgTime;
 
   public NodeHandler(Node node, KadService kadService) {
     this.node = node;
@@ -139,6 +141,11 @@ public class NodeHandler {
   }
 
   public void handleFindNode(FindNodeMessage msg) {
+    long now = System.currentTimeMillis();
+    if (now - rcvFindNodeMsgTime < threshold) {
+      return;
+    }
+    rcvFindNodeMsgTime = now;
     List<Node> closest = kadService.getTable().getClosestNodes(msg.getTargetId());
     sendNeighbours(closest, msg.getTimestamp());
   }

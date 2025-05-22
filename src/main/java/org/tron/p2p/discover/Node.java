@@ -24,6 +24,9 @@ public class Node implements Serializable, Cloneable {
   @Getter
   protected String hostV6;
 
+  @Getter
+  private InetSocketAddress inetSocketAddress;
+
   protected int port;
 
   @Setter
@@ -45,6 +48,7 @@ public class Node implements Serializable, Cloneable {
     this.bindPort = port;
     this.updateTime = System.currentTimeMillis();
     formatHostV6();
+    this.inetSocketAddress = address;
   }
 
   public Node(byte[] id, String hostV4, String hostV6, int port) {
@@ -55,6 +59,7 @@ public class Node implements Serializable, Cloneable {
     this.bindPort = port;
     this.updateTime = System.currentTimeMillis();
     formatHostV6();
+    this.inetSocketAddress = getPreferInetSocketAddress();
   }
 
   public Node(byte[] id, String hostV4, String hostV6, int port, int bindPort) {
@@ -65,6 +70,22 @@ public class Node implements Serializable, Cloneable {
     this.bindPort = bindPort;
     this.updateTime = System.currentTimeMillis();
     formatHostV6();
+    this.inetSocketAddress = getPreferInetSocketAddress();
+  }
+
+  public Node(InetSocketAddress address, byte[] id, int bindPort) {
+    this.inetSocketAddress = address;
+    this.id = id;
+    this.bindPort = bindPort;
+    if (address.getAddress() instanceof Inet4Address) {
+      this.hostV4 = address.getAddress().getHostAddress();
+    } else {
+      this.hostV6 = address.getAddress().getHostAddress();
+    }
+  }
+
+  public boolean isConnectible() {
+    return inetSocketAddress.getPort() == bindPort;
   }
 
   public void updateHostV4(String hostV4) {
@@ -93,6 +114,9 @@ public class Node implements Serializable, Cloneable {
   }
 
   public InetSocketAddress getPreferInetSocketAddress() {
+    if (inetSocketAddress != null) {
+      return inetSocketAddress;
+    }
     if (StringUtils.isNotEmpty(hostV4) && StringUtils.isNotEmpty(Parameter.p2pConfig.getIp())) {
       return getInetSocketAddressV4();
     } else if (StringUtils.isNotEmpty(hostV6) && StringUtils.isNotEmpty(

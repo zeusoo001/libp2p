@@ -1,8 +1,10 @@
 package org.tron.p2p.utils;
 
+import com.google.protobuf.ByteString;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -89,6 +91,13 @@ public class NetUtil {
     byte[] id = new byte[Constant.NODE_ID_LEN];
     gen.nextBytes(id);
     return id;
+  }
+
+  public static ByteString getRandomBytes(int size) {
+    Random gen = new Random();
+    byte[] id = new byte[size];
+    gen.nextBytes(id);
+    return ByteString.copyFrom(id);
   }
 
   private static String getExternalIp(String url) {
@@ -227,8 +236,15 @@ public class NetUtil {
     Future<String> future;
     String result = null;
     try {
-      future = completionService.take();
-      result = future.get();
+      for (int i = 0; i < tasks.size(); i++) {
+        future = completionService.take();
+        result = future.get();
+        if (NetUtil.validIpV6(result) || NetUtil.validIpV4(result)) {
+          break;
+        } else {
+          result = null;
+        }
+      }
     } catch (InterruptedException | ExecutionException e) {
       //ignore
     } finally {
@@ -247,5 +263,34 @@ public class NetUtil {
       lanIP = "127.0.0.1";
     }
     return lanIP;
+  }
+
+  public static boolean isPrivateIPv4(InetAddress address) {
+    byte[] bytes = address.getAddress();
+    int first = bytes[0] & 0xFF;
+    int second = bytes[1] & 0xFF;
+    return (first == 10) ||
+            (first == 172 && second >= 16 && second <= 31) ||
+            (first == 192 && second == 168);
+  }
+
+  public static boolean isPrivateIPv6(InetAddress address) {
+    byte[] bytes = address.getAddress();
+    int firstByte = bytes[0] & 0xFF;
+
+    // Unique Local Address fc00::/7（fc00::/8、fd00::/8）
+    if ((firstByte & 0xFE) == 0xFC) {
+      return true;
+    }
+    // Link-Local Address fe80::/10
+    return (firstByte == 0xFE) && ((bytes[1] & 0xC0) == 0x80);
+  }
+
+  public static boolean isPrivateIp(InetAddress address) {
+    if (address instanceof Inet4Address) {
+      return isPrivateIPv4(address);
+    } else {
+      return isPrivateIPv6(address);
+    }
   }
 }
